@@ -39,6 +39,26 @@ export default function Home() {
   const voiceNameRef = useRef("");
   const volumeRef = useRef(1);
   const autoRef = useRef(true);
+  const scrollRaf = useRef(0);
+
+  const maxScroll = () =>
+    Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
+  const animateScrollTo = (target: number) => {
+    const startY = window.scrollY;
+    const distance = target - startY;
+    if (Math.abs(distance) < 1) return;
+    const startTime = performance.now();
+    const duration = 700;
+    cancelAnimationFrame(scrollRaf.current);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      window.scrollTo(0, startY + distance * ease);
+      if (t < 1) scrollRaf.current = requestAnimationFrame(step);
+    };
+    scrollRaf.current = requestAnimationFrame(step);
+  };
 
   useEffect(() => {
     if (!supported) return;
@@ -47,7 +67,12 @@ export default function Home() {
       setVoices(v);
       setVoiceName((prev) => {
         const next =
-          prev || v.find((x) => /albert/i.test(x.name))?.name || v[0]?.name || "";
+          prev ||
+          v.find((x) => /raul/i.test(x.name) && /^es[-_]MX/i.test(x.lang))?.name ||
+          v.find((x) => /raul/i.test(x.name))?.name ||
+          v.find((x) => /^es[-_]MX/i.test(x.lang))?.name ||
+          v[0]?.name ||
+          "";
         voiceNameRef.current = next;
         return next;
       });
@@ -60,8 +85,9 @@ export default function Home() {
     const vs = window.speechSynthesis.getVoices();
     return (
       vs.find((v) => v.name === voiceNameRef.current) ||
-      vs.find((v) => /albert/i.test(v.name)) ||
-      vs.find((v) => /^es/i.test(v.lang) && /male|pablo|diego|jorge|carlos|miguel/i.test(v.name)) ||
+      vs.find((v) => /raul/i.test(v.name) && /^es[-_]MX/i.test(v.lang)) ||
+      vs.find((v) => /raul/i.test(v.name)) ||
+      vs.find((v) => /^es[-_]MX/i.test(v.lang)) ||
       vs.find((v) => /^es/i.test(v.lang)) ||
       null
     );
@@ -71,15 +97,20 @@ export default function Home() {
     readingRef.current = false;
     setReading(false);
     sessionRef.current++;
+    cancelAnimationFrame(scrollRaf.current);
     if (supported) window.speechSynthesis.cancel();
   };
 
   const readPage = (pageIdx: number, session: number) => {
     const chunks = splitText(pages[pageIdx].text);
+    const estimates = chunks.map((t) => Math.max(6000, t.length * 150));
+    const totalEst = estimates.reduce((a, b) => a + b, 0) || 1;
     let ci = 0;
+    let elapsed = 0;
     const next = () => {
       if (session !== sessionRef.current || !readingRef.current) return;
       if (ci >= chunks.length) {
+        animateScrollTo(maxScroll());
         if (autoRef.current && pageIdx + 1 < pages.length) {
           setI(pageIdx + 1);
           speakPage(pageIdx + 1);
@@ -89,6 +120,7 @@ export default function Home() {
         return;
       }
       const text = chunks[ci];
+      animateScrollTo((elapsed / totalEst) * maxScroll());
       const u = new SpeechSynthesisUtterance(text);
       const voice = pickVoice();
       if (voice) {
@@ -105,6 +137,7 @@ export default function Home() {
         if (done) return;
         done = true;
         window.clearTimeout(timer);
+        elapsed += estimates[ci] || 0;
         ci++;
         next();
       };
@@ -132,16 +165,9 @@ export default function Home() {
     readingRef.current = true;
     setReading(true);
     setI(idx);
-    const start = () => {
-      if (session !== sessionRef.current) return;
-      window.speechSynthesis.cancel();
-      readPage(idx, session);
-    };
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = start;
-    } else {
-      start();
-    }
+    window.speechSynthesis.cancel();
+    animateScrollTo(0);
+    readPage(idx, session);
   };
 
   const goto = (idx: number) => {
@@ -215,7 +241,6 @@ export default function Home() {
         {reading && <span className="text-sm text-green-600">Leyendo…</span>}
       </div>
       <img src={`/pages/page-${page.page}.png`} alt={`Página ${page.page}`} className="max-w-full border" />
-      <textarea readOnly value={page.text} className="w-full max-w-4xl h-48 border p-2 text-sm" />
     </main>
   );
 }
