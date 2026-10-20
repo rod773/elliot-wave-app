@@ -1,69 +1,70 @@
-import Image from "next/image";
+﻿"use client";
+
+import { useEffect, useRef, useState } from "react";
+import pages from "@/pages.json";
 
 export default function Home() {
+  const [i, setI] = useState(0);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceName, setVoiceName] = useState("");
+  const [volume, setVolume] = useState(1);
+  const reading = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const load = () => {
+      const v = window.speechSynthesis.getVoices().filter((x) => /^es/i.test(x.lang));
+      setVoices(v);
+      setVoiceName((prev) => prev || v.find((x) => /albert/i.test(x.name))?.name || v[0]?.name || "");
+    };
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+  }, []);
+  const page = pages[i];
+  const speakPage = (idx: number) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (idx >= pages.length) { reading.current = false; return; }
+    reading.current = true;
+    setI(idx);
+    window.speechSynthesis.cancel();
+    const pick = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const voice =
+        voices.find((v) => v.name === voiceName) ||
+        voices.find((v) => /albert/i.test(v.name)) ||
+        voices.find((v) => /es/i.test(v.lang) && /male|pablo|diego|jorge|carlos|miguel/i.test(v.name));
+      const u = new SpeechSynthesisUtterance(pages[idx].text);
+      if (voice) {
+        u.voice = voice;
+        u.lang = voice.lang || "es-ES";
+      } else {
+        u.lang = "es-ES";
+      }
+      u.volume = volume;
+      window.speechSynthesis.speak(u);
+    };
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = pick;
+    } else {
+      pick();
+    }
+  };
+  const speak = () => speakPage(i);
+  const stop = () => { reading.current = false; window.speechSynthesis.cancel(); };
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="flex min-h-screen flex-col items-center gap-4 p-4">
+      <h1 className="text-2xl font-bold">Principio de las Ondas de Elliott</h1>
+      <div className="flex gap-2 items-center">
+        <button disabled={i===0} onClick={()=>setI(i-1)} className="px-3 py-1 border rounded">Anterior</button>
+        <span>Página {page.page} / {pages.length}</span>
+        <button disabled={i===pages.length-1} onClick={()=>setI(i+1)} className="px-3 py-1 border rounded">Siguiente</button>
+        <select value={voiceName} onChange={(e)=>setVoiceName(e.target.value)} className="border rounded px-2 py-1 text-sm">
+          {voices.map((v) => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
+        </select>
+        <button onClick={speak} className="px-3 py-1 border rounded">Leer</button>
+        <button onClick={stop} className="px-3 py-1 border rounded">Detener</button>
+      </div>
+      <img src={`/pages/page-${page.page}.png`} alt={`Página ${page.page}`} className="max-w-full border" />
+      <textarea readOnly value={page.text} className="w-full max-w-4xl h-48 border p-2 text-sm" />
+    </main>
   );
 }
