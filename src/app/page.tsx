@@ -188,9 +188,18 @@ export default function Home() {
         <button disabled={i === 0} onClick={() => goto(i - 1)} className="px-3 py-1 border rounded">
           Anterior
         </button>
-        <span>
-          Página {page.page} / {pages.length}
-        </span>
+        <select
+          value={i}
+          onChange={(e) => goto(Number(e.target.value))}
+          className="border rounded px-2 py-1 text-sm"
+          aria-label="Seleccionar página"
+        >
+          {pages.map((p, idx) => (
+            <option key={p.page} value={idx}>
+              Página {p.page} / {pages.length}
+            </option>
+          ))}
+        </select>
         <button disabled={i === pages.length - 1} onClick={() => goto(i + 1)} className="px-3 py-1 border rounded">
           Siguiente
         </button>
